@@ -1,5 +1,6 @@
 # POC-Gestao_de_Multas
-Controle de controles
+Protótipo Educacional: Gestão e Ciclo de Vida de Multas de Frota
+Aplicação desenvolvida para controle operacional, ranking de condutores infratores e análise preditiva de recursos com IA.
 # Aviso de Propósito Educacional e Isenção de Responsabilidade
 
 Este projeto foi desenvolvido por alunos como um Protótipo de Prova de Conceito 
