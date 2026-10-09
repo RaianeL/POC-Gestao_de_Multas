@@ -2,23 +2,19 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-import openai
 
 st.set_page_config(page_title="PoC - Gestão Ativa de Multas", page_icon="🚦", layout="wide")
 
 st.title("🚦 Gestão Dinâmica do Ciclo de Vida de Multas")
-st.caption("Cadastre novas infrações e atualize o status do fluxo em tempo real.")
+st.caption("Cadastre novas infrações, atualize o status do fluxo e simule a geração de recursos com IA.")
 
 # Sidebar - Configurações
 st.sidebar.header("⚙️ Configurações da Aplicação")
-api_key = st.sidebar.text_input("Insira a sua OpenAI API Key:", type="password")
+st.sidebar.info("💡 **Modo Demonstrativo:** Geração de documentos por simulação de IA (sem necessidade de API Key).")
 st.sidebar.markdown("---")
 
 # 1. BASE DE DADOS EM MEMÓRIA (SESSION STATE)
 if "dados_multas" not in st.session_state:
-    # Dados iniciais para o app não começar vazio
     dados_iniciais = [
         {"ID_Multa": "NTE-1001", "Placa": "ABC-1234", "Motorista": "Carlos Silva", "Infracao": "Excesso de Velocidade (20%)", "Pontos": 4, "Valor_R$": 130.16, "Status_Ciclo": "Notificação Recebida", "Dias_Atraso_Notificacao": 15, "Foto_Anexa": 1, "Chance_Deferimento": "Não"},
         {"ID_Multa": "NTE-1002", "Placa": "XYZ-5678", "Motorista": "Ana Souza", "Infracao": "Avanço de Sinal Vermelho", "Pontos": 7, "Valor_R$": 293.47, "Status_Ciclo": "Indicação Feita", "Dias_Atraso_Notificacao": 35, "Foto_Anexa": 0, "Chance_Deferimento": "Sim"},
@@ -64,7 +60,7 @@ if btn_cadastrar and placa_in and mot_in:
         "Infracao": inf_in,
         "Pontos": regras[inf_in]["pontos"],
         "Valor_R$": regras[inf_in]["valor"],
-        "Status_Ciclo": "Notificação Recebida", # Inicia sempre na primeira etapa
+        "Status_Ciclo": "Notificação Recebida",
         "Dias_Atraso_Notificacao": dias_in,
         "Foto_Anexa": foto_val,
         "Chance_Deferimento": def_val
@@ -120,34 +116,61 @@ st.subheader("📋 Tabela Geral de Multas Cadastradas")
 st.dataframe(df[["ID_Multa", "Placa", "Motorista", "Infracao", "Pontos", "Valor_R$", "Status_Ciclo"]], use_container_width=True)
 
 # ----------------------------------------------------
-# MODELO DE ML E IA GENERATIVA
+# SIMULAÇÃO DE GERADOR DE RECURSOS COM TEMPLATES (SEM API)
 # ----------------------------------------------------
 st.markdown("---")
-st.header("2. 🤖 Assistente de Recursos com IA")
+st.header("2. 🤖 Gerador Automático de Recursos e Notificações (Simulação de IA)")
 
 if not df.empty:
-    multa_ia = st.selectbox("Escolha uma multa para analisar/gerar recurso:", df["ID_Multa"].tolist())
+    multa_ia = st.selectbox("Escolha uma multa para gerar documento:", df["ID_Multa"].tolist())
     dados_m = df[df["ID_Multa"] == multa_ia].iloc[0]
     
-    st.info(f"**Multa selecionada:** {dados_m['ID_Multa']} | **Infrator:** {dados_m['Motorista']} | **Infração:** {dados_m['Infracao']} | **Status:** {dados_m['Status_Ciclo']}")
+    tipo_doc = st.radio("Selecione o tipo de documento a gerar:", ["Recurso Administrativo de Defesa", "Notificação Interna ao Condutor"])
+    justificativa = st.text_area("Observação/Justificativa do Caso:", placeholder="Ex: Veículo em socorro urgente ou falha de sinalização.")
     
-    justificativa = st.text_area("Observação/Justificativa para o recurso:", placeholder="Ex: Veículo em socorro urgente de equipamento no trecho.")
-    
-    if st.button("Gerar Recurso Administrativo com IA"):
-        if not api_key:
-            st.error("Insira sua OpenAI API Key na barra lateral.")
+    if st.button("Gerar Documento Automático"):
+        if tipo_doc == "Recurso Administrativo de Defesa":
+            template_recurso = f"""
+            ILUSTRÍSSIMO SENHOR PRESIDENTE DA JUNTA ADMINISTRATIVA DE RECURSOS DE INFRAÇÕES (JARI)
+            
+            Ref.: DEFESA PRÉVIA DE MULTA DE TRÂNSITO
+            Auto de Infração nº: {dados_m['ID_Multa']}
+            Veículo Placa: {dados_m['Placa']}
+            Condutor Indicado: {dados_m['Motorista']}
+            
+            DOS FATOS E DA FUNDAMENTAÇÃO LEGAL:
+            Vem respeitosamente solicitar o CANCELAMENTO e ARQUIVAMENTO da autuação referente à infração de "{dados_m['Infracao']}".
+            
+            1. Da Notificação: O auto de infração foi recebido com {dados_m['Dias_Atraso_Notificacao']} dias de expedição, excedendo o prazo legal estabelecido pelo Art. 281 do CTB.
+            2. Da Justificativa Operacional: {justificativa if justificativa else 'O veículo encontrava-se em operação oficial e com prioridade regulamentar.'}
+            
+            DOS PEDIDOS:
+            Ante o exposto, requer-se o deferimento do presente recurso e o consequente cancelamento da autuação e dos {dados_m['Pontos']} pontos na CNH.
+            
+            [Data Atual] - Gestão de Frotas Corporativas.
+            """
+            st.success("📜 **Recurso Administrativo Gerado com Sucesso:**")
+            st.code(template_recurso, language="markdown")
+            
         else:
-            try:
-                client = openai.OpenAI(api_key=api_key)
-                prompt_sys = "Você é um advogado especialista em trânsito. Elabore um recurso administrativo formal de multa."
-                prompt_usr = f"Infração: {dados_m['Infracao']}. Placa: {dados_m['Placa']}. Notificação recebida em {dados_m['Dias_Atraso_Notificacao']} dias. Justificativa: {justificativa}"
-                
-                with st.spinner("Gerando documento..."):
-                    res = client.chat.completions.create(
-                        model="gpt-3.5-turbo",
-                        messages=[{"role": "system", "content": prompt_sys}, {"role": "user", "content": prompt_usr}]
-                    )
-                    st.success("Documento gerado:")
-                    st.write(res.choices[0].message.content)
-            except Exception as e:
-                st.error(f"Erro na API: {e}")
+            template_notificacao = f"""
+            COMUNICAÇÃO INTERNA - GESTÃO DE FROTAS
+            
+            Para: {dados_m['Motorista']}
+            Assunto: Notificação de Infração de Trânsito - Veículo {dados_m['Placa']}
+            
+            Prezado(a) {dados_m['Motorista']},
+            
+            Informamos que foi identificada uma infração de trânsito no veículo sob sua responsabilidade:
+            - Infração: {dados_m['Infracao']}
+            - Pontuação prevista: {dados_m['Pontos']} pontos
+            - Valor do Boleto: R$ {dados_m['Valor_R$']:.2f}
+            
+            Observações do Gestor:
+            "{justificativa if justificativa else 'Favor comparecer ao setor administrativo para assinatura do formulário de indicação de condutor.'}"
+            
+            Atenciosamente,
+            Departamento de Gestão de Frotas.
+            """
+            st.info("✉️ **Notificação Interna Gerada com Sucesso:**")
+            st.code(template_notificacao, language="markdown")
